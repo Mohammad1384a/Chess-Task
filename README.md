@@ -2,40 +2,43 @@
 
 A small TypeScript tool that analyzes **PGN files (including multi-game PGNs)** and outputs the **positions where a fork or pin is created**.
 
-The project is intentionally backend-only (no UI) and provides:
+This repo contains:
 
-- a **core library** (`@repo/core`) with pure detection logic
-- a **CLI** (`tactics`) to run analysis locally
+- `@repo/core`: pure, testable detection logic
+- `@repo/cli`: a CLI wrapper (`tactics`) to run analysis locally
+
+Workspace packages: `packages/core`, `packages/cli`.
 
 ---
 
-## What the tool detects
+## Definitions (what we detect)
 
-### Pins (absolute pins)
+### Pins (absolute)
 
 A **pin** is detected when:
 
 - the attacker is a **bishop, rook, or queen**
 - along a straight line (diagonal/file/rank), the attacker sees:
-  1. an enemy piece (the _pinned_ piece)
+  1. an enemy piece (the pinned piece)
   2. and behind it the **enemy king**
-- the **king is never considered “pinned”** (king cannot be pinned)
+- **the king cannot be pinned** (we never return a pin where the pinned piece is a king)
 
 Output includes:
 
+- `kind: "absolute"`
 - `attacker` (square/piece/color)
 - `pinned` (square/piece/color)
-- `behind` (the king square/piece/color)
-- `kind: "absolute"`
+- `behind` (square/piece/color) — the king
 
 ### Forks
 
 A **fork** is detected when:
 
-- a single attacker piece attacks **2 or more enemy pieces** in the same position
-- to keep output high-signal, **pawn targets are ignored**
-  - King is always counted as a valid target
-  - All other targets must be **minor+** (value ≥ 3)
+- a single attacker attacks **2+ enemy pieces** in the same position
+- to keep the output high-signal:
+  - **pawn targets are ignored**
+  - king is always counted as a valid target
+  - all other targets must be **minor+** (value ≥ 3)
 
 Output includes:
 
@@ -46,18 +49,16 @@ Output includes:
 
 ## What “created” means
 
-A tactic is considered **created on a ply** if it exists in the **after-position** of that ply, but did **not** exist in the **before-position** of that ply.
+A tactic is considered **created on a ply** if it exists in the **after-position** of that ply, but **did not exist** in the **before-position** of that ply.
 
-Implementation-wise:
+Implementation:
 
 - for each move:
   - compute motifs in `beforeFen`
   - compute motifs in `afterFen`
   - emit only `(after − before)` (set difference via stable motif signatures)
 
-Important detail:
-
-- a move can create tactics for **either side**, so we check “created motifs” for **both colors** after each ply.
+Note: a move can create tactics for **either side**, so we detect created motifs for **both colors** after each ply.
 
 ---
 
@@ -84,7 +85,6 @@ The CLI prints JSON like:
     }
   ]
 }
-```
 
 Where:
 
@@ -103,8 +103,11 @@ packages/
 core/ # pure logic (detect forks/pins, analyze multi-game PGN)
 cli/ # CLI wrapper around core
 
-Design goals:
 
+
+
+
+Design goals:
 core is deterministic + testable
 
 CLI is thin glue (IO only)
@@ -114,6 +117,9 @@ Prerequisites
 
 Node.js 20+
 pnpm 10+
+
+
+
 
 1. Install dependencies
 
@@ -145,6 +151,8 @@ Create a sample file (or use your own PGN) run this command in a Bash terminal(n
 1. e4 e5 2. Nf3 Nc6 3. Bb5 d6 \*
    PGN`
 
+
+
 Run the CLI:
 
 `node packages/cli/dist/main.js analyze --input ./sample.pgn --pretty`
@@ -154,10 +162,19 @@ Optional:
 filter motifs:
 
 `node packages/cli/dist/main.js analyze --input ./sample.pgn --pretty --motifs fork`
+`node packages/cli/dist/main.js analyze --input ./sample.pgn --pretty --motifs pin`
 
 write to a file:
 
 `node packages/cli/dist/main.js analyze --input ./sample.pgn --pretty --out out.json`
+
+print a summary line (stderr):
+
+`node packages/cli/dist/main.js analyze --input ./sample.pgn --pretty --summary`
+
+read from stdin:
+
+`cat ./sample.pgn | node packages/cli/dist/main.js analyze --pretty`
 
 Notes / tradeoffs
 
@@ -168,3 +185,4 @@ Relative pins (pinned to higher value piece) can be added later if needed.
 Fork detection ignores pawn targets to reduce noise.
 
 This can be relaxed if a broader definition is desired.
+```

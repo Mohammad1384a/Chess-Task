@@ -2,7 +2,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import process from "process";
-import { Command } from "commander";
+import { parseArgs } from "util";
 import { analyzePgn, type AnalysisResult, type Occurrence } from "@repo/core";
 
 type MotifType = "fork" | "pin";
@@ -43,11 +43,7 @@ function readStdin(): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     let data = "";
     process.stdin.setEncoding("utf8");
-
-    process.stdin.on("data", (chunk: string) => {
-      data += chunk;
-    });
-
+    process.stdin.on("data", (chunk: string) => (data += chunk));
     process.stdin.on("end", () => resolve(data));
     process.stdin.on("error", (err: Error) => reject(err));
   });
@@ -96,88 +92,62 @@ function printSummary(occurrences: Occurrence[], sourceLabel: string): void {
   );
 }
 
-async function runAnalyze(opts: {
-  input?: string;
-  out?: string;
-  pretty?: boolean;
-  motifs?: string;
-  summary?: boolean;
-}): Promise<void> {
-  const motifs = parseMotifs(opts.motifs);
+async function main(): Promise<void> {
+  // Allow either:
+  //   tactics analyze --input ...
+  // or:
+  //   tactics --input ...
+  const raw = process.argv.slice(2);
+  const args = raw[0] === "analyze" ? raw.slice(1) : raw;
 
-  const { pgn, sourceLabel } = await loadPgn(opts.input);
+  const { values, positionals } = parseArgs({
+    args,
+    allowPositionals: true,
+    options: {
+      input: { type: "string", short: "i" },
+      out: { type: "string", short: "o" },
+      pretty: { type: "boolean" },
+      motifs: { type: "string" },
+      summary: { type: "boolean" },
+      help: { type: "boolean", short: "h" },
+    },
+  });
+
+  if (values.help) {
+    process.stdout.write(
+      [
+        "Usage:",
+        "  tactics analyze --input <file.pgn> [--out out.json] [--pretty] [--motifs fork,pin] [--summary]",
+        "  tactics --input <file.pgn> [--out out.json] [--pretty] [--motifs fork,pin] [--summary]",
+        "",
+        "Options:",
+        "  -i, --input <path>    Input PGN file (or pipe via stdin)",
+        "  -o, --out <path>      Write output JSON to a file (default: stdout)",
+        "  --pretty              Pretty-print JSON",
+        "  --motifs <list>       Comma-separated: fork,pin",
+        "  --summary             Print summary line on stderr",
+        "  -h, --help            Show help",
+        "",
+      ].join("\n"),
+    );
+    return;
+  }
+
+  const input = values.input ?? (positionals[0] as string | undefined);
+  const out = values.out;
+  const pretty = Boolean(values.pretty);
+  const motifs = parseMotifs(values.motifs);
+  const summary = Boolean(values.summary);
+
+  const { pgn, sourceLabel } = await loadPgn(input);
   const result = analyzePgn(pgn);
   const filtered = filterOccurrences(result, motifs);
 
-  if (opts.summary) {
+  if (summary) {
     printSummary(filtered.occurrences, sourceLabel);
   }
 
-  writeOutput(filtered, opts.out, Boolean(opts.pretty));
-}
-
-function optsFromActionArgs(args: unknown[]): Record<string, unknown> {
-  // Commander always passes the Command instance as the last arg to action handlers.
-  const last = args[args.length - 1];
-  if (
-    last &&
-    typeof last === "object" &&
-    typeof (last as any).opts === "function"
-  ) {
-    return (last as any).opts() as Record<string, unknown>;
-  }
-
-  // Fallback: if commander ever passes options as the first arg
-  const first = args[0];
-  if (first && typeof first === "object")
-    return first as Record<string, unknown>;
-
-  return {};
-}
-
-async function main(): Promise<void> {
-  const program = new Command();
-
-  program
-    .name("tactics")
-    .description("Detect created forks and pins in PGN (multi-game supported)")
-    .version("1.0.0");
-
-  program
-    .command("analyze")
-    .description("Analyze a PGN file (or stdin) and output JSON results")
-    .option(
-      "-i, --input <path>",
-      "Input PGN file. If omitted, reads from stdin when piped.",
-    )
-    .option("-o, --out <path>", "Write output JSON to a file (default: stdout)")
-    .option("--pretty", "Pretty-print JSON", false)
-    .option(
-      "--motifs <list>",
-      "Comma-separated motif filter: fork,pin (default: both)",
-    )
-    .option("--summary", "Print summary line on stderr", false)
-    .action(async (...args: unknown[]) => {
-      const opts = optsFromActionArgs(args) as any;
-      await runAnalyze(opts);
-    });
-
-  // Default command: tactics [input]
-  program
-    .argument("[input]", "Input PGN file (optional if piping via stdin)")
-    .option("-o, --out <path>", "Write output JSON to a file (default: stdout)")
-    .option("--pretty", "Pretty-print JSON", false)
-    .option(
-      "--motifs <list>",
-      "Comma-separated motif filter: fork,pin (default: both)",
-    )
-    .option("--summary", "Print summary line on stderr", false)
-    .action(async (input: string | undefined, ...args: unknown[]) => {
-      const opts = optsFromActionArgs(args) as any;
-      await runAnalyze({ ...opts, input });
-    });
-
-  await program.parseAsync(process.argv);
+  writeOutput(filtered, out, pretty);
 }
 
 main().catch((err: unknown) => {
