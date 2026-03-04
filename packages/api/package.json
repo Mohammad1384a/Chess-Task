@@ -1,0 +1,20 @@
+{
+  "name": "@repo/api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.28.2",
+  "dependencies": {
+    "@repo/core": "workspace:*",
+    "fastify": "^5.7.4"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.3"
+  }
+}

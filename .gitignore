@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+**/dist/
+build/
+**/build/
+out/
+**/out/
+lib/
+**/lib/
+
+# TypeScript caches
+*.tsbuildinfo
+
+# Tests / coverage
+coverage/
+**/coverage/
+.vitest/
+**/.vitest/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Runtime / temp files
+tmp/
+temp/
+.cache/
+.eslintcache
+
+# IDE / OS junk
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+!.vscode/extensions.json
+
+# pnpm / tooling
+.pnpm-store/
+.turbo/
