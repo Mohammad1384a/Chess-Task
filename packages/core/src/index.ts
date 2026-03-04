@@ -1,4 +1,5 @@
 export { detectPins } from "./engine/pins";
+export { detectForks } from "./engine/forks";
 export type Color = "w" | "b";
 
 export type Motif =
@@ -24,10 +25,6 @@ export type Occurrence = {
 };
 
 export type AnalysisResult = { occurrences: Occurrence[] };
-
-export function detectForks(_fen: string, _attacker: Color): Motif[] {
-  return [];
-}
 
 /**
  * Must parse multi-game PGN.
