@@ -1,4 +1,4 @@
-// packages/core/src/index.ts
+export { detectPins } from "./engine/pins";
 export type Color = "w" | "b";
 
 export type Motif =
@@ -26,10 +26,6 @@ export type Occurrence = {
 export type AnalysisResult = { occurrences: Occurrence[] };
 
 export function detectForks(_fen: string, _attacker: Color): Motif[] {
-  return [];
-}
-
-export function detectPins(_fen: string, _attacker: Color): Motif[] {
   return [];
 }
 
