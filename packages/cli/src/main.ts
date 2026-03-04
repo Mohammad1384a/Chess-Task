@@ -68,7 +68,7 @@ async function loadPgn(
   }
 
   throw new Error(
-    `Missing PGN input. Provide --input <file.pgn> or pipe via stdin.`,
+    "Missing PGN input. Provide --input <file.pgn> or pipe via stdin.",
   );
 }
 
@@ -84,13 +84,13 @@ function writeOutput(payload: unknown, outPath?: string, pretty = false): void {
   const full = path.resolve(process.cwd(), outPath);
   fs.mkdirSync(path.dirname(full), { recursive: true });
   fs.writeFileSync(full, json, "utf8");
+  process.stderr.write(`Wrote ${full}\n`);
 }
 
 function printSummary(occurrences: Occurrence[], sourceLabel: string): void {
   const forks = occurrences.filter((o) => o.motif.type === "fork").length;
   const pins = occurrences.filter((o) => o.motif.type === "pin").length;
 
-  // stderr so JSON stdout stays clean
   process.stderr.write(
     `Analyzed ${sourceLabel}: ${occurrences.length} occurrences (forks=${forks}, pins=${pins})\n`,
   );
@@ -109,11 +109,30 @@ async function runAnalyze(opts: {
   const result = analyzePgn(pgn);
   const filtered = filterOccurrences(result, motifs);
 
-  if (opts.summary === true) {
+  if (opts.summary) {
     printSummary(filtered.occurrences, sourceLabel);
   }
 
   writeOutput(filtered, opts.out, Boolean(opts.pretty));
+}
+
+function optsFromActionArgs(args: unknown[]): Record<string, unknown> {
+  // Commander always passes the Command instance as the last arg to action handlers.
+  const last = args[args.length - 1];
+  if (
+    last &&
+    typeof last === "object" &&
+    typeof (last as any).opts === "function"
+  ) {
+    return (last as any).opts() as Record<string, unknown>;
+  }
+
+  // Fallback: if commander ever passes options as the first arg
+  const first = args[0];
+  if (first && typeof first === "object")
+    return first as Record<string, unknown>;
+
+  return {};
 }
 
 async function main(): Promise<void> {
@@ -137,18 +156,11 @@ async function main(): Promise<void> {
       "--motifs <list>",
       "Comma-separated motif filter: fork,pin (default: both)",
     )
-    .option("--no-summary", "Disable summary line on stderr", false)
-    .action(
-      async (opts: {
-        input?: string;
-        out?: string;
-        pretty?: boolean;
-        motifs?: string;
-        summary?: boolean;
-      }) => {
-        await runAnalyze(opts);
-      },
-    );
+    .option("--summary", "Print summary line on stderr", false)
+    .action(async (...args: unknown[]) => {
+      const opts = optsFromActionArgs(args) as any;
+      await runAnalyze(opts);
+    });
 
   // Default command: tactics [input]
   program
@@ -159,20 +171,11 @@ async function main(): Promise<void> {
       "--motifs <list>",
       "Comma-separated motif filter: fork,pin (default: both)",
     )
-    .option("--no-summary", "Disable summary line on stderr")
-    .action(
-      async (
-        input: string | undefined,
-        opts: {
-          out?: string;
-          pretty?: boolean;
-          motifs?: string;
-          summary?: boolean;
-        },
-      ) => {
-        await runAnalyze({ ...opts, input });
-      },
-    );
+    .option("--summary", "Print summary line on stderr", false)
+    .action(async (input: string | undefined, ...args: unknown[]) => {
+      const opts = optsFromActionArgs(args) as any;
+      await runAnalyze({ ...opts, input });
+    });
 
   await program.parseAsync(process.argv);
 }
