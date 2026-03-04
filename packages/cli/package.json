@@ -1,20 +1,23 @@
 {
   "name": "@repo/cli",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "type": "module",
+  "private": true,
+  "bin": {
+    "tactics": "dist/main.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "packageManager": "pnpm@10.28.2",
+  "scripts": {
+    "build": "tsup",
+    "start": "node dist/main.js",
+    "analyze": "node dist/main.js analyze"
+  },
   "dependencies": {
     "@repo/core": "workspace:*",
-    "commander": "^14.0.3"
+    "commander": "^12.1.0"
   },
   "devDependencies": {
-    "@types/node": "^25.3.3"
+    "@types/node": "^22.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
   }
 }

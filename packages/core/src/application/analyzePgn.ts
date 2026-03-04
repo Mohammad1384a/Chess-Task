@@ -1,7 +1,7 @@
 import { Chess } from "chess.js";
-import { detectForks } from "../engine/forks";
-import { detectPins } from "../engine/pins";
-import type { AnalysisResult, Color, Motif, Occurrence } from "../index";
+import { detectForks } from "../engine/forks.js";
+import { detectPins } from "../engine/pins.js";
+import type { AnalysisResult, Color, Motif, Occurrence } from "../index.js";
 
 function normalizePgn(pgn: string): string {
   return pgn.replace(/\r\n/g, "\n").trim();

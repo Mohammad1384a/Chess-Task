@@ -1,6 +1,6 @@
-export { detectPins } from "./engine/pins";
-export { detectForks } from "./engine/forks";
-export { analyzePgn } from "./application/analyzePgn";
+export { detectPins } from "./engine/pins.js";
+export { detectForks } from "./engine/forks.js";
+export { analyzePgn } from "./application/analyzePgn.js";
 export type Color = "w" | "b";
 
 export type Motif =

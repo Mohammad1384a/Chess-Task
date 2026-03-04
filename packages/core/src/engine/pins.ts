@@ -1,5 +1,5 @@
 import { Chess, type Square } from "chess.js";
-import type { Color, Motif } from "../index";
+import type { Color, Motif } from "../index.js";
 
 type PieceType = "p" | "n" | "b" | "r" | "q" | "k";
 type Coord = { x: number; y: number }; // x: 0..7 (a..h), y: 0..7 (1..8)
