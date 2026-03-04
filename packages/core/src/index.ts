@@ -1,5 +1,6 @@
 export { detectPins } from "./engine/pins";
 export { detectForks } from "./engine/forks";
+export { analyzePgn } from "./application/analyzePgn";
 export type Color = "w" | "b";
 
 export type Motif =
@@ -25,11 +26,3 @@ export type Occurrence = {
 };
 
 export type AnalysisResult = { occurrences: Occurrence[] };
-
-/**
- * Must parse multi-game PGN.
- * Must emit only motifs that are CREATED (after - before) per ply.
- */
-export function analyzePgn(_pgn: string): AnalysisResult {
-  return { occurrences: [] };
-}
