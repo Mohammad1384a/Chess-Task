@@ -73,7 +73,8 @@ async function loadPgn(
 }
 
 function writeOutput(payload: unknown, outPath?: string, pretty = false): void {
-  const json = JSON.stringify(payload, null, pretty ? 2 : 0);
+  const shouldPretty = pretty || (!outPath && process.stdout.isTTY);
+  const json = JSON.stringify(payload, null, shouldPretty ? 2 : 0);
 
   if (!outPath) {
     process.stdout.write(json + "\n");
@@ -108,7 +109,7 @@ async function runAnalyze(opts: {
   const result = analyzePgn(pgn);
   const filtered = filterOccurrences(result, motifs);
 
-  if (opts.summary !== false) {
+  if (opts.summary === true) {
     printSummary(filtered.occurrences, sourceLabel);
   }
 
@@ -136,7 +137,7 @@ async function main(): Promise<void> {
       "--motifs <list>",
       "Comma-separated motif filter: fork,pin (default: both)",
     )
-    .option("--no-summary", "Disable summary line on stderr")
+    .option("--no-summary", "Disable summary line on stderr", false)
     .action(
       async (opts: {
         input?: string;
