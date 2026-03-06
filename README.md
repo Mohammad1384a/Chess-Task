@@ -84,7 +84,7 @@ The CLI prints JSON like:
       }
     }
   ]
-}
+}```
 
 Where:
 
