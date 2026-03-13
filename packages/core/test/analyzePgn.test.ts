@@ -1,16 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { analyzePgn } from "../src";
 
-function isForkFromF7(o: any) {
+function isForkFromE6(o: any) {
+  const targetSquares = new Set(o.motif?.targets?.map((t: any) => t.square));
   return (
     o.motif?.type === "fork" &&
-    o.motif?.attacker?.square === "f7" &&
-    new Set(o.motif?.targets?.map((t: any) => t.square)).has("d8") &&
-    new Set(o.motif?.targets?.map((t: any) => t.square)).has("h8")
+    o.motif?.attacker?.square === "e6" &&
+    targetSquares.has("d8") &&
+    targetSquares.has("f8")
   );
 }
 
-function isPinB5C6E8(o: any) {
+function isAbsolutePinB5C6E8(o: any) {
   return (
     o.motif?.type === "pin" &&
     o.motif?.kind === "absolute" &&
@@ -20,15 +21,29 @@ function isPinB5C6E8(o: any) {
   );
 }
 
+function isRelativePinB5C6D7(o: any) {
+  return (
+    o.motif?.type === "pin" &&
+    o.motif?.kind === "relative" &&
+    o.motif?.attacker?.square === "b5" &&
+    o.motif?.pinned?.square === "c6" &&
+    o.motif?.behind?.square === "d7"
+  );
+}
+
 /**
  * Requirement: accept PGN with multiple games and output positions
  * where a fork or pin is CREATED (after - before).
  */
 describe("analyzePgn", () => {
   it("handles multi-game PGN and emits only CREATED motifs with ply + fen", () => {
+    // Fork game: use a SetUp/FEN so the fork is unquestionably practical:
+    // White plays Ne6, forking Qf8 and Rd8. Knight cannot be captured immediately.
     const pgn = `
 [Event "ForkGame"]
-1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. Ng5 d5 5. exd5 Nxd5 6. Nxf7 *
+[SetUp "1"]
+[FEN "3r1qk1/8/8/6N1/8/8/8/K7 w - - 0 1"]
+1. Ne6 *
 
 [Event "PinGame"]
 1. e4 e5 2. Nf3 Nc6 3. Bb5 d6 *
@@ -37,11 +52,11 @@ describe("analyzePgn", () => {
     const { occurrences } = analyzePgn(pgn);
 
     const forkOcc = occurrences.find(
-      (o) => o.gameIndex === 0 && o.ply === 11 && isForkFromF7(o),
+      (o) => o.gameIndex === 0 && o.ply === 1 && isForkFromE6(o),
     );
 
     const pinOcc = occurrences.find(
-      (o) => o.gameIndex === 1 && o.ply === 6 && isPinB5C6E8(o),
+      (o) => o.gameIndex === 1 && o.ply === 6 && isAbsolutePinB5C6E8(o),
     );
 
     expect(forkOcc, "expected created fork occurrence in game 0").toBeTruthy();
@@ -59,7 +74,7 @@ describe("analyzePgn", () => {
     const { occurrences } = analyzePgn(pgn);
 
     const pinOcc = occurrences.find(
-      (o) => o.gameIndex === 0 && o.ply === 6 && isPinB5C6E8(o),
+      (o) => o.gameIndex === 0 && o.ply === 6 && isAbsolutePinB5C6E8(o),
     );
     expect(pinOcc, "expected pin occurrence even without headers").toBeTruthy();
   });
@@ -74,7 +89,7 @@ describe("analyzePgn", () => {
     const { occurrences } = analyzePgn(pgn);
 
     const pinOccurrences = occurrences.filter(
-      (o) => o.gameIndex === 0 && isPinB5C6E8(o),
+      (o) => o.gameIndex === 0 && isAbsolutePinB5C6E8(o),
     );
     expect(pinOccurrences.length, "pin should be emitted exactly once").toBe(1);
     expect(pinOccurrences[0].ply, "pin should be created at ply 6").toBe(6);
@@ -83,17 +98,19 @@ describe("analyzePgn", () => {
   it("handles Windows newlines and extra whitespace", () => {
     const pgn =
       '\r\n[Event "ForkGame"]\r\n' +
-      "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. Ng5 d5 5. exd5 Nxd5 6. Nxf7 *\r\n\r\n" +
+      '[SetUp "1"]\r\n' +
+      '[FEN "3r1qk1/8/8/6N1/8/8/8/K7 w - - 0 1"]\r\n' +
+      "1. Ne6 *\r\n\r\n" +
       '[Event "PinGame"]\r\n' +
       "1. e4 e5 2. Nf3 Nc6 3. Bb5 d6 *\r\n";
 
     const { occurrences } = analyzePgn(pgn);
 
     const hasFork = occurrences.some(
-      (o) => o.gameIndex === 0 && o.ply === 11 && isForkFromF7(o),
+      (o) => o.gameIndex === 0 && o.ply === 1 && isForkFromE6(o),
     );
     const hasPin = occurrences.some(
-      (o) => o.gameIndex === 1 && o.ply === 6 && isPinB5C6E8(o),
+      (o) => o.gameIndex === 1 && o.ply === 6 && isAbsolutePinB5C6E8(o),
     );
 
     expect(hasFork, "expected fork even with CRLF").toBe(true);
@@ -103,62 +120,39 @@ describe("analyzePgn", () => {
   it("captures SAN for the key fork move (useful for UX/debugging)", () => {
     const pgn = `
 [Event "ForkSan"]
-1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. Ng5 d5 5. exd5 Nxd5 6. Nxf7 *
+[SetUp "1"]
+[FEN "3r1qk1/8/8/6N1/8/8/8/K7 w - - 0 1"]
+1. Ne6 *
 `.trim();
 
     const { occurrences } = analyzePgn(pgn);
 
     const forkOcc = occurrences.find(
-      (o) => o.gameIndex === 0 && o.ply === 11 && isForkFromF7(o),
+      (o) => o.gameIndex === 0 && o.ply === 1 && isForkFromE6(o),
     );
     expect(forkOcc).toBeTruthy();
-    expect(forkOcc!.san).toBe("Nxf7");
+    expect(forkOcc!.san).toBe("Ne6");
   });
-});
 
-/**
- * Requirement: accept PGN with multiple games and output positions
- * where a fork or pin is CREATED (after - before). :contentReference[oaicite:1]{index=1}
- */
-describe("analyzePgn", () => {
-  it("handles multi-game PGN and emits only CREATED motifs with ply + fen", () => {
+  it("emits a relative pin to the queen when it is created (king/queen pins only)", () => {
+    // Need ...d6 first; otherwise Qd7 is illegal (pawn on d7 blocks the queen).
+    // After 4...Qd7, bishop b5 pins knight c6 to queen d7 (relative pin).
     const pgn = `
-[Event "ForkGame"]
-1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. Ng5 d5 5. exd5 Nxd5 6. Nxf7 *
-
-[Event "PinGame"]
-1. e4 e5 2. Nf3 Nc6 3. Bb5 d6 *
+[Event "RelativePinToQueen"]
+1. e4 e5 2. Nf3 Nc6 3. Bb5 d6 4. O-O Qd7 *
 `.trim();
 
     const { occurrences } = analyzePgn(pgn);
 
-    // Fork: created on white ply 11 (the move "Nxf7")
-    const forkOcc = occurrences.find(
-      (o) =>
-        o.gameIndex === 0 &&
-        o.ply === 11 &&
-        o.motif.type === "fork" &&
-        o.motif.attacker.square === "f7",
+    const relPinOcc = occurrences.find(
+      (o) => o.gameIndex === 0 && o.ply === 8 && isRelativePinB5C6D7(o),
     );
 
-    // Pin: created after black plays "d6" => ply 6, and it creates a WHITE pin
-    const pinOcc = occurrences.find(
-      (o) =>
-        o.gameIndex === 1 &&
-        o.ply === 6 &&
-        o.motif.type === "pin" &&
-        o.motif.attacker.square === "b5" &&
-        o.motif.pinned.square === "c6" &&
-        o.motif.behind.square === "e8",
-    );
-
-    expect(forkOcc, "expected created fork occurrence in game 0").toBeTruthy();
-    expect(pinOcc, "expected created pin occurrence in game 1").toBeTruthy();
-
-    // San + fen should be present for debugging / downstream tooling
-    expect(forkOcc?.san).toBeTypeOf("string");
-    expect(forkOcc?.fen).toBeTypeOf("string");
-    expect(pinOcc?.san).toBeTypeOf("string");
-    expect(pinOcc?.fen).toBeTypeOf("string");
+    expect(
+      relPinOcc,
+      "expected created relative pin (b5 -> c6 -> d7)",
+    ).toBeTruthy();
+    expect(relPinOcc?.san).toBe("Qd7");
+    expect(relPinOcc?.fen).toBeTypeOf("string");
   });
 });

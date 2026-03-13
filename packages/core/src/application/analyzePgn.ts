@@ -11,7 +11,6 @@ function splitMultiGamePgn(pgn: string): string[] {
   const text = normalizePgn(pgn);
   if (!text) return [];
 
-  // Prefer splitting by [Event ...] headers (standard multi-game PGN delimiter).
   const eventMatches = Array.from(text.matchAll(/^\[Event\b.*$/gm));
   if (eventMatches.length >= 2) {
     const starts = eventMatches
@@ -29,21 +28,26 @@ function splitMultiGamePgn(pgn: string): string[] {
     return games;
   }
 
-  // If there is only one [Event] or none, treat it as a single game.
   return [text];
+}
+
+function extractStartFen(gamePgn: string): string | null {
+  // chess.js supports PGN tags [SetUp "1"] and [FEN "..."] for non-standard initial positions.
+  const fenMatch = gamePgn.match(/^\[FEN\s+"([^"]+)"\]\s*$/im);
+  if (!fenMatch) return null;
+  return fenMatch[1];
 }
 
 function motifSignature(m: Motif): string {
   if (m.type === "fork") {
     const targets = [...m.targets]
-      .map((t) => t.square)
+      .map((t) => `${t.square}:${t.piece}`)
       .sort()
       .join(",");
-    return `fork|${m.attacker.color}|${m.attacker.square}|${targets}`;
+    return `fork|${m.attacker.color}|${m.attacker.square}:${m.attacker.piece}|${targets}`;
   }
 
-  // pin
-  return `pin|${m.kind}|${m.attacker.color}|${m.attacker.square}|${m.pinned.square}|${m.behind.square}`;
+  return `pin|${m.kind}|${m.attacker.color}|${m.attacker.square}:${m.attacker.piece}|${m.pinned.square}:${m.pinned.piece}|${m.behind.square}:${m.behind.piece}`;
 }
 
 function motifsInPosition(fen: string, attacker: Color): Motif[] {
@@ -63,7 +67,6 @@ function createdMotifs(
 }
 
 function analyzeSingleGame(gamePgn: string, gameIndex: number): Occurrence[] {
-  // Load once to get a clean list of moves, then replay for per-ply FENs.
   const loader = new Chess();
   try {
     loader.loadPgn(gamePgn);
@@ -73,47 +76,31 @@ function analyzeSingleGame(gamePgn: string, gameIndex: number): Occurrence[] {
     );
   }
 
-  const verboseMoves = loader.history({ verbose: true }) as Array<{
-    from: string;
-    to: string;
-    promotion?: string;
-  }>;
-
-  if (verboseMoves.length === 0) {
-    // If you want to allow empty games, remove this.
+  const sanMoves = loader.history(); // SAN list from the PGN's starting position
+  if (sanMoves.length === 0) {
     throw new Error(`Invalid/empty PGN for gameIndex=${gameIndex}`);
   }
 
-  const moves = loader.history({ verbose: true }) as Array<{
-    from: string;
-    to: string;
-    promotion?: string;
-  }>;
+  // IMPORTANT: replay must start from the PGN’s declared FEN (if any)
+  const startFen = extractStartFen(gamePgn);
+  const replay = startFen ? new Chess(startFen) : new Chess();
 
-  const replay = new Chess();
   const occurrences: Occurrence[] = [];
 
-  for (let i = 0; i < moves.length; i++) {
+  for (let i = 0; i < sanMoves.length; i++) {
     const ply = i + 1;
     const beforeFen = replay.fen();
 
-    const m = moves[i];
-    const res = replay.move({
-      from: m.from as any,
-      to: m.to as any,
-      promotion: m.promotion as any,
-    });
-
-    if (!res)
+    const res = replay.move(sanMoves[i]);
+    if (!res) {
       throw new Error(
         `Illegal move while replaying gameIndex=${gameIndex}, ply=${ply}`,
       );
+    }
 
     const afterFen = replay.fen();
     const san = res.san;
 
-    // Product-y choice: a move can create a motif for either side,
-    // so we diff both colors each ply.
     const colors: Color[] = ["w", "b"];
     for (const attacker of colors) {
       const created = createdMotifs(beforeFen, afterFen, attacker);

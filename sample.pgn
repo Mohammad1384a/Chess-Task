@@ -1,5 +1,10 @@
 [Event "ForkGame"]
-1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. Ng5 d5 5. exd5 Nxd5 6. Nxf7 *
+[SetUp "1"]
+[FEN "3r1qk1/8/8/6N1/8/8/8/K7 w - - 0 1"]
+1. Ne6 *
 
 [Event "PinGame"]
 1. e4 e5 2. Nf3 Nc6 3. Bb5 d6 *
+
+[Event "RelativePinToQueen"]
+1. e4 e5 2. Nf3 Nc6 3. Bb5 d6 4. O-O Qd7 *
